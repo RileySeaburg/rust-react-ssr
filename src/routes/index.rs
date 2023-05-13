@@ -1,24 +1,85 @@
 use actix_web::{get, web, HttpResponse, Responder};
-use std::{env, fs::read_to_string};
-use v8::*;
+use deno_core::anyhow::{bail, Error};
+use deno_core::{
+    resolve_import, resolve_path, FastString, JsRuntime, ModuleLoader, ModuleSource,
+    ModuleSourceFuture, ModuleSpecifier, ModuleType, ResolutionKind, RuntimeOptions,
+};
+use futures::FutureExt;
+use std::cell::RefCell;
+use std::env;
+use std::path::{self, Path};
+use std::pin::Pin;
+use std::rc::Rc;
+
+pub struct SimpleModuleLoader;
+
+impl ModuleLoader for SimpleModuleLoader {
+    fn resolve(
+        &self,
+        specifier: &str,
+        referrer: &str,
+        _is_main: ResolutionKind,
+    ) -> Result<ModuleSpecifier, Error> {
+        Ok(resolve_import(specifier, referrer)?)
+    }
+
+    fn load(
+        &self,
+        module_specifier: &ModuleSpecifier,
+        _maybe_referrer: Option<&ModuleSpecifier>,
+        _is_dyn_import: bool,
+    ) -> Pin<Box<ModuleSourceFuture>> {
+        let module_specifier = module_specifier.clone();
+        let string_specifier = module_specifier.to_string();
+
+        async move {
+            let mut module_url_found = string_specifier.clone();
+            let bytes = match module_specifier.scheme() {
+                "http" | "https" => {
+                    let res = reqwest::get(module_specifier).await?;
+                    let res = res.error_for_status()?;
+                    module_url_found = res.url().to_string();
+                    res.bytes().await?.to_vec()
+                }
+                "file" => {
+                    let path = match module_specifier.to_file_path() {
+                        Ok(path) => path,
+                        Err(_) => bail!("Invalid file URL."),
+                    };
+                    tokio::fs::read(path).await?
+                }
+                "data" => {
+                    let url = match reqwest::Url::parse(&string_specifier) {
+                        Ok(url) => url,
+                        Err(_) => bail!("Not a valid data URL."),
+                    };
+                    let data: Vec<u8> = url.path().as_bytes().to_vec();
+                    data
+                }
+                              schema => bail!("Invalid schema {}", schema),
+            };
+
+            let code = String::from_utf8(bytes).unwrap();
+            let module_type = ModuleType::JavaScript;
+            let module_url_specified = resolve_path(&string_specifier, &env::current_dir()?)?;
+            let module_url_found = resolve_path(&module_url_found, &env::current_dir()?)?;
+
+            Ok(ModuleSource::new_with_redirect(
+                module_type,
+                code.into(),
+                &module_url_specified,
+                &module_url_found,
+            ))
+        }
+        .boxed_local()
+    }
+}
 
 #[get("/")]
 async fn index() -> HttpResponse {
-    // initialize the platform
-    let platform = new_default_platform(4, false);
-    V8::initialize_platform(platform.into());
-    V8::initialize();
-    // initialize the isolate
-    let isolate = &mut Isolate::new(Default::default());
-
-    // Define the exports object
-    let js_shim = r#"
-        var exports = {};
-    "#;
-
     let props = r##"{
         "params": [
-            "hello",W
+            "hello",
             "ciao",
             "こんにちは"
         ]
@@ -36,56 +97,33 @@ async fn index() -> HttpResponse {
   </head>
   <body>
     <div id="root"><!--app-html--></div>
-    <script type="module" src="./vite/client/dist/client/entry-server.js"></script>
+    <script type="module" src="./vite/client/dist/client/entry-server.mjs"></script>
   </body>
 </html>
-
 "##
     );
 
-    let current_dir = match env::current_dir() {
-        Ok(current_dir) => current_dir.display().to_string(),
-        Err(err) => format!("Failed to get the current working directory: {}", err),
+    let options = RuntimeOptions {
+        module_loader: Some(Rc::new(SimpleModuleLoader)),
+        ..Default::default()
     };
+    let mut runtime = JsRuntime::new(options);
 
-    let source = read_to_string("../client/dist/server/bundle.js").unwrap_or_else(|_| {
-        panic!(
-            "Error reading file {}, CWD: {}",
-            "../client/dist/server/bundle.js", current_dir
-        )
-    });
+    let current_dir = std::env::current_dir().expect("Failed to get current directory");
+   let specifier = deno_core::ModuleSpecifier::resolve(url.as_str())
+    .expect("Failed to create module specifier");
 
-    // Combine the shim and the server bundle
-    let js_code = format!("{}{}", js_shim, source);
 
-    // createa scope for the execution
-    let scope = &mut HandleScope::new(isolate);
 
-    // Create a new context for the execution
-    // Create a new context without using a snapshot
-    let context = Context::new(scope);
+    runtime
+        .load_main_module(&specifier, None)
+        .await
+        .expect("Failed to load module");
 
-    // Enter the context for compiling and
-    // running the hello world script
-
-    let scope = &mut ContextScope::new(scope, context);
-
-    // Compile the code
-    let code = js_code;
-
-    let code = v8::String::new(scope, &code).unwrap();
-
-    let script = v8::Script::compile(scope, code, None).unwrap();
-
-    // Run the script
-    let result = script.run(scope).unwrap();
-
-    // Convert the result to a string and print it
-    let result = result.to_string(scope).unwrap();
-
-    println!("{}", result.to_rust_string_lossy(scope));
-
-    // Create a new object template
+    runtime
+        .run_event_loop(true)
+        .await
+        .expect("Failed to run event loop");
 
     HttpResponse::Ok().body(html)
 }

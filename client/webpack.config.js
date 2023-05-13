@@ -4,11 +4,18 @@ module.exports = {
   mode: 'production',
   entry: './dist/server/entry-server.js',
   output: {
-    path: path.resolve(__dirname, 'build'),
-    filename: 'bundle.js',
+    path: path.resolve(__dirname, 'dist/server'),
+    filename: 'entry-server.mjs',
     library: 'MyLibrary', // Name of the library
-    libraryTarget: 'umd', // Universal module definition
+    libraryTarget: 'module', // Output as ES module
+    module: true, // Enable output.module
+    environment: {
+      module: true, // Enable output.environment.module
+    },
     globalObject: 'this', // Ensure the library works in different environments
+  },
+  experiments: {
+    outputModule: true, // Enable experiments.outputModule
   },
   module: {
     rules: [
@@ -19,7 +26,7 @@ module.exports = {
           loader: 'babel-loader',
           options: {
             presets: [
-              ['@babel/preset-env', { modules: 'commonjs' }],
+              ['@babel/preset-env', { modules: false }], // Output as ES modules
               '@babel/preset-react',
             ],
           },
@@ -29,6 +36,13 @@ module.exports = {
   },
   resolve: {
     extensions: ['.js'],
+    alias: {
+      'react': path.resolve(__dirname, 'node_modules/react/index.js'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom/index.js'),
+    },
+    fallback: {
+      util: require.resolve("util/")
+    },
   },
   target: 'node',
   externalsPresets: { node: true }, // Exclude Node.js built-in modules

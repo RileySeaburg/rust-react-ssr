@@ -15,7 +15,7 @@ export default defineConfig({
       },
       external: ['react', 'react-dom'], // External dependencies for the server bundle
       output: {
-        format: 'esm', // Output format for the server bundle (CommonJS)
+        format: 'es', // Output format for the server bundle (Rollup output)
         exports: 'auto', // Automatically handle exports
       },
     },

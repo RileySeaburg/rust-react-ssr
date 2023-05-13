@@ -3,10 +3,7 @@ use std::env;
 use actix_files::Files;
 use actix_session::storage::CookieSessionStore;
 use actix_web::cookie::Key;
-use actix_web::{
-    web::{self},
-    App, HttpServer,
-};
+use actix_web::{web, App, HttpServer};
 use tera::Tera;
 mod models;
 mod routes;
@@ -45,8 +42,8 @@ async fn main() -> std::io::Result<()> {
                 get_secret_key().expect("Failed to generate secret key"),
             ))
             .service(routes::index::index)
-            .service(Files::new("/static", "../static").show_files_listing())
-            .service(Files::new("/vite", "../client/dist/client").show_files_listing())
+            .service(Files::new("/static", "./static").show_files_listing())
+            .service(Files::new("/vite", "./client/dist/client").show_files_listing())
     })
     .bind("127.0.0.1:8000")?
     .run()
