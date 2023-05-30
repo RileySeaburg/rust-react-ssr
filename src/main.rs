@@ -5,8 +5,6 @@ use actix_session::storage::CookieSessionStore;
 use actix_web::cookie::Key;
 use actix_web::{web, App, HttpServer};
 use tera::Tera;
-mod models;
-mod routes;
 
 fn get_secret_key() -> Result<Key, Box<dyn std::error::Error>> {
     let secret_key_from_env = env::var("SECRET_KEY")?;
