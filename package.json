@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "wasm-loader": "^1.3.0"
+  }
+}

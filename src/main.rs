@@ -1,10 +1,20 @@
-use std::env;
-
+pub mod models;
+pub mod routes;
+use std::{env, fs::read_to_string};
+use std::sync::Mutex;
+use actix_web::{
+    dev::Server, get, http::StatusCode, web, App, Error, HttpRequest, HttpResponse, HttpServer,
+    Responder,
+};
 use actix_files::Files;
 use actix_session::storage::CookieSessionStore;
 use actix_web::cookie::Key;
-use actix_web::{web, App, HttpServer};
 use tera::Tera;
+
+
+pub struct AppState {
+    js_source: Mutex<String>, // <- Mutex is necessary to mutate safely across threads
+}
 
 fn get_secret_key() -> Result<Key, Box<dyn std::error::Error>> {
     let secret_key_from_env = env::var("SECRET_KEY")?;
@@ -29,6 +39,11 @@ async fn main() -> std::io::Result<()> {
         // Load tera templates from the specified directory
         println!("Initializing Actix web application...");
 
+        let state = web::Data::new(AppState {
+            js_source: Mutex::new(
+                read_to_string("../build/index.js").expect("Failed to load the resource."),
+            ),
+        });
         App::new()
             .wrap(
                 actix_web::middleware::Logger::default()
@@ -41,9 +56,9 @@ async fn main() -> std::io::Result<()> {
             ))
             .service(routes::index::index)
             .service(Files::new("/static", "./static").show_files_listing())
-            .service(Files::new("/vite", "./client/dist/client").show_files_listing())
+            .service(Files::new("/react-ssr", "./client/build").show_files_listing())
     })
-    .bind("127.0.0.1:8000")?
+    .bind("127.0.0.1:8080")?
     .run()
     .await
 }

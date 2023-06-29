@@ -7,7 +7,7 @@
     "build": "npm run build:client && npm run build:server && npm run bundle",
     "build:client": "vite build --ssrManifest --outDir dist/client",
     "build:server": "vite build --ssr src/entry-server.tsx --outDir dist/server",
-    "bundle": "rollup -c",
+    "bundle": "yarn run bundle:client && yarn run bundle:server",
     "preview": "cross-env NODE_ENV=production node server"
   },
   "dependencies": {
@@ -40,5 +40,6 @@
     "ts-loader": "^9.4.2",
     "typescript": "^5.0.4",
     "vite": "^4.0.4"
-  }
+  },
+  "type": "module"
 }

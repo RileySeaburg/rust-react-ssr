@@ -1,4 +1,8 @@
 pub mod index;
-pub use index::*;pub mod dashboard;
-pub use dashboard::*;pub mod login;
+pub mod dashboard;
+pub mod login;
+
+
+pub use index::*;
+pub use dashboard::*;
 pub use login::*;

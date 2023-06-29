@@ -1,0 +1,5 @@
+{
+  "tasks": {
+    "dev": "deno run -A --unstable --node-modules-dir npm:vite"
+  }
+}

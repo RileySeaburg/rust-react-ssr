@@ -1,6 +1,6 @@
 use actix_web::{get, web, HttpResponse, HttpRequest, Error};
 use tera::{Context, Tera};
-use crate::models;
+
 use models::user::UserLogin;
 
 #[get("/login")]
@@ -12,6 +12,8 @@ async fn login_route(tmpl: web::Data<Tera>) -> HttpResponse {
 }
 
  use actix_web::post;
+
+use crate::models;
 
 #[post("/login")]
 async fn login_function(
